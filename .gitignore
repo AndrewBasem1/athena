@@ -1,0 +1,5 @@
+.venv/*
+.vscode/*
+.pytest_cache/*
+*.zip
+.env
