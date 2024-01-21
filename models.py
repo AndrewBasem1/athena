@@ -66,6 +66,7 @@ class CraigslistVehicleRecordRead(SQLModel):
         """
         A field validator that extracts the number of cylinders from the cylinders cell value to be converted to an int.
         """
+        # the next line is used to convert empty strings to None
         cylinders_cell_value = cls.empty_string_to_none(cylinders_cell_value)
         if cylinders_cell_value is None:
             return None
@@ -88,6 +89,10 @@ class CraigslistVehicleRecord(CraigslistVehicleRecordRead, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
 
 
-if __name__ == "__main__":
-    # pass
+def recreate_db_tables_from_scratch():
+    SQLModel.metadata.drop_all(bind=db_engine)
     SQLModel.metadata.create_all(bind=db_engine)
+
+
+if __name__ == "__main__":
+    recreate_db_tables_from_scratch()
