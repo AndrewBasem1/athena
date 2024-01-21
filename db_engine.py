@@ -11,4 +11,4 @@ DATABASE_SCHEMA = environ["DATABASE_SCHEMA"]
 
 database_connection_url = f"mysql+pymysql://{DATABASE_USERNAME}:{DATABASE_PASSWORD}@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_SCHEMA}"
 
-db_engine = create_engine(database_connection_url)
+db_engine = create_engine(database_connection_url, echo=True)
