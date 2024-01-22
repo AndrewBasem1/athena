@@ -10,10 +10,28 @@ from os import environ
 from sqlmodel import Session
 from db_engine import db_engine
 from pydantic import ValidationError as PydanticValidationError
+from re import match
 
 
-def _create_csv_records_iterator_from_zip_file(
-    zip_file_path: Path, csv_file_name: str
+def strip_strings_and_replace_empty_strings_with_none(input_str: str) -> str:
+    input_str = input_str.strip()
+    return input_str if input_str != "" else None
+
+
+def extract_cylinders_int_value_from_cylinders_str(cylinders_str: str) -> int:
+    if cylinders_str is None:
+        return None
+    pat = r"(\d+)"
+    match_obj = match(pat, cylinders_str)
+    if match_obj:
+        return int(match_obj.group(1))
+    else:
+        return None
+
+
+def create_csv_records_iterator_from_zip_file(
+    zip_file_path: Path = environ.get("ZIP_FILE_NAME"),
+    csv_file_name: str = environ.get("CSV_FILE_NAME"),
 ) -> Iterator[dict[str, str]]:
     """
     helper function for reading csv lines from a zip file without extracting it to save memory (disk and RAM)
@@ -34,11 +52,17 @@ def _create_csv_records_iterator_from_zip_file(
             csv_reader = csv.reader(decoded_csv_file)
             csv_headers = next(csv_reader)
             for line in csv_reader:
+                line = map(strip_strings_and_replace_empty_strings_with_none, line)
                 line_record_dict = dict(zip(csv_headers, line))
+                line_record_dict[
+                    "cylinders"
+                ] = extract_cylinders_int_value_from_cylinders_str(
+                    line_record_dict["cylinders"]
+                )
                 yield line_record_dict
 
 
-def _validate_craigslist_vehicle_record_dict(
+def validate_craigslist_vehicle_record_dict(
     craigslist_vehicle_record_dict: dict[str, str]
 ) -> CraigslistVehicleRecord:
     """
@@ -53,7 +77,7 @@ def _validate_craigslist_vehicle_record_dict(
     return craigslist_vehicle_record
 
 
-def _insert_batch_of_craigslist_vehicle_records(
+def insert_batch_of_craigslist_vehicle_records(
     batch_of_craigslist_vehicle_records: list[CraigslistVehicleRecord],
     db_engine: Engine = db_engine,
 ) -> None:
@@ -73,7 +97,7 @@ def migrate_craigslist_records_csv_from_zip_to_db(
     """
     parses and inserts the Craigslist vehicle records from a zip file into the database.
     """
-    csv_lines_iterator = _create_csv_records_iterator_from_zip_file(
+    csv_lines_iterator = create_csv_records_iterator_from_zip_file(
         zip_file_path=zip_file_path, csv_file_name=csv_file_name
     )
     # getting the first line for the col headers
@@ -87,7 +111,7 @@ def migrate_craigslist_records_csv_from_zip_to_db(
             if rows_count_in_current_batch < batch_size:
                 current_record_dict = next(csv_lines_iterator)
                 try:
-                    craiglist_vehicle_record = _validate_craigslist_vehicle_record_dict(
+                    craiglist_vehicle_record = validate_craigslist_vehicle_record_dict(
                         current_record_dict
                     )
                     current_batch.append(craiglist_vehicle_record)
@@ -100,7 +124,7 @@ def migrate_craigslist_records_csv_from_zip_to_db(
                     continue
             else:
                 print(f"starting batch insertion of {batch_size} records")
-                _insert_batch_of_craigslist_vehicle_records(current_batch)
+                insert_batch_of_craigslist_vehicle_records(current_batch)
                 print(f"finished batch insertion of {batch_size} records")
                 total_rows_inserted += rows_count_in_current_batch
                 rows_count_in_current_batch = 0
