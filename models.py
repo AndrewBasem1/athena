@@ -20,7 +20,7 @@ class CraigslistVehicleRecordRead(SQLModel):
     """
 
     url: strOrNone = nonIndexedNullableField
-    region: strOrNone = nonIndexedNullableField
+    region: strOrNone = indexedNullableField
     region_url: strOrNone = nonIndexedNullableField
     price: intOrNone = nonIndexedNullableField
     year: intOrNone = nonIndexedNullableField
@@ -37,7 +37,7 @@ class CraigslistVehicleRecordRead(SQLModel):
     type: strOrNone = nonIndexedNullableField
     paint_color: strOrNone = nonIndexedNullableField
     image_url: strOrNone = nonIndexedNullableField
-    county: strOrNone = indexedNullableField
+    county: strOrNone = nonIndexedNullableField
     state: strOrNone = indexedNullableField
     lat: floatOrNone = nonIndexedNullableField
     long: floatOrNone = nonIndexedNullableField
@@ -56,6 +56,7 @@ class CraigslistVehicleRecord(CraigslistVehicleRecordRead, table=True):
 
 
 def recreate_db_tables_from_scratch():
+    """Drops all tables if they exist and recreates them from scratch according to our predefined sqlmodel Models."""
     SQLModel.metadata.drop_all(bind=db_engine)
     SQLModel.metadata.create_all(bind=db_engine)
 

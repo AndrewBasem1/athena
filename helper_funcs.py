@@ -93,6 +93,7 @@ def migrate_craigslist_records_csv_from_zip_to_db(
     zip_file_path: Path = environ.get("ZIP_FILE_NAME"),
     csv_file_name: str = environ.get("CSV_FILE_NAME"),
     batch_size: int = 10_000,
+    max_rows_to_parse: int = None,
 ) -> None:
     """
     parses and inserts the Craigslist vehicle records from a zip file into the database.
@@ -105,7 +106,7 @@ def migrate_craigslist_records_csv_from_zip_to_db(
     total_rows_parsed = 0
     total_rows_inserted = 0
     current_batch = []
-    for i in range(100_000):
+    while True:
         try:
             print(f"total_rows_parsed: {total_rows_parsed}", end="\r")
             if rows_count_in_current_batch < batch_size:
@@ -125,12 +126,23 @@ def migrate_craigslist_records_csv_from_zip_to_db(
             else:
                 print(f"starting batch insertion of {batch_size} records")
                 insert_batch_of_craigslist_vehicle_records(current_batch)
-                print(f"finished batch insertion of {batch_size} records")
                 total_rows_inserted += rows_count_in_current_batch
+                print(
+                    f"finished batch insertion of {batch_size} records, total_rows_inserted: {total_rows_inserted}"
+                )
+                if max_rows_to_parse and total_rows_parsed >= max_rows_to_parse:
+                    break
                 rows_count_in_current_batch = 0
                 current_batch = []
         except StopIteration:
             break
+    if current_batch:
+        print(f"starting batch insertion of {batch_size} records")
+        insert_batch_of_craigslist_vehicle_records(current_batch)
+        total_rows_inserted += rows_count_in_current_batch
+        print(
+            f"finished batch insertion of {batch_size} records, total_rows_inserted: {total_rows_inserted}"
+        )
     print(f"total_rows_parsed: {total_rows_parsed}")
     print(f"total_rows_inserted: {total_rows_inserted}")
     return None
