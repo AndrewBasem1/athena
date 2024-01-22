@@ -1,11 +1,7 @@
 from sqlmodel import SQLModel
 from sqlmodel import Field
-from pydantic import field_validator
 from datetime import datetime
 from typing import Union
-from re import match
-from sqlalchemy import BigInteger
-from sqlalchemy import Column
 from db_engine import db_engine
 from typing import Optional
 
@@ -47,36 +43,6 @@ class CraigslistVehicleRecordRead(SQLModel):
     long: floatOrNone = nonIndexedNullableField
     posting_date: datetimeOrNone = indexedNullableField
     removal_date: datetimeOrNone = indexedNullableField
-
-    @field_validator("*", mode="before")
-    @classmethod
-    def empty_string_to_none(cls, cell_value) -> None:
-        """
-        a field validator that converts empty strings to None
-        so we minimize the number of empty strings in the database
-        """
-        if isinstance(cell_value, str):
-            if cell_value.strip() == "":
-                return None
-        return cell_value
-
-    @field_validator("cylinders", mode="before")
-    @classmethod
-    def get_number_of_cylinders(cls, cylinders_cell_value) -> Union[int, None]:
-        """
-        A field validator that extracts the number of cylinders from the cylinders cell value to be converted to an int.
-        """
-        if isinstance(cylinders_cell_value, int):
-            return cylinders_cell_value
-        else:
-            pattern = r"\d"
-            try:
-                regex_match = match(pattern, cylinders_cell_value)
-                regex_match_str = regex_match[0]
-                regex_match_int = int(regex_match_str)
-                return regex_match_int
-            except:
-                return None
 
 
 class CraigslistVehicleRecord(CraigslistVehicleRecordRead, table=True):
