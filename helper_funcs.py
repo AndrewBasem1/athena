@@ -2,7 +2,7 @@ import zipfile
 import csv
 import io
 from pathlib import Path
-from typing import Generator
+from typing import Iterator
 from sqlalchemy import Engine
 from models import CraigslistVehicleRecordRead
 from models import CraigslistVehicleRecord
@@ -12,9 +12,9 @@ from db_engine import db_engine
 from pydantic import ValidationError as PydanticValidationError
 
 
-def _csv_lines_generator_from_zip_file(
+def _create_csv_records_iterator_from_zip_file(
     zip_file_path: Path, csv_file_name: str
-) -> Generator[str, None, None]:
+) -> Iterator[dict[str, str]]:
     """
     helper function for reading csv lines from a zip file without extracting it to save memory (disk and RAM)
 
@@ -23,17 +23,34 @@ def _csv_lines_generator_from_zip_file(
     - csv_file_name: `str` name of the csv file inside the zip file
 
     ## Returns
-    - `Generator[str, None, None]` a generator of csv lines
+    - `Iterator[dict[str, str]]` object that yields a dict of csv record values with the csv headers as keys
 
     ## Usage
-    calling `next()` on the generator object returned will return the next csv line as a `str`
+    calling `next()` on the Iterator object returned will return the next csv record as a dict
     """
     with zipfile.ZipFile(zip_file_path) as zip_file:
         with zip_file.open(csv_file_name) as csv_file:
             decoded_csv_file = io.TextIOWrapper(csv_file, encoding="utf-8")
             csv_reader = csv.reader(decoded_csv_file)
+            csv_headers = next(csv_reader)
             for line in csv_reader:
-                yield line
+                line_record_dict = dict(zip(csv_headers, line))
+                yield line_record_dict
+
+
+def _validate_craigslist_vehicle_record_dict(
+    craigslist_vehicle_record_dict: dict[str, str]
+) -> CraigslistVehicleRecord:
+    """
+    validates a Craigslist vehicle record dict and returns a CraigslistVehicleRecord object.
+    """
+    craigslist_vehicle_record_without_id = CraigslistVehicleRecordRead.model_validate(
+        craigslist_vehicle_record_dict
+    )
+    craigslist_vehicle_record = CraigslistVehicleRecord.model_validate(
+        craigslist_vehicle_record_without_id
+    )
+    return craigslist_vehicle_record
 
 
 def _insert_batch_of_craigslist_vehicle_records(
@@ -56,32 +73,22 @@ def migrate_craigslist_records_csv_from_zip_to_db(
     """
     parses and inserts the Craigslist vehicle records from a zip file into the database.
     """
-    csv_lines_generator = _csv_lines_generator_from_zip_file(
+    csv_lines_iterator = _create_csv_records_iterator_from_zip_file(
         zip_file_path=zip_file_path, csv_file_name=csv_file_name
     )
     # getting the first line for the col headers
-    col_headers = next(csv_lines_generator)
     rows_count_in_current_batch = 0
     total_rows_parsed = 0
     total_rows_inserted = 0
     current_batch = []
-    while True:
+    for i in range(100_000):
         try:
             print(f"total_rows_parsed: {total_rows_parsed}", end="\r")
-            while rows_count_in_current_batch < batch_size:
-                current_row_values = next(csv_lines_generator)
-                current_record_dict = {
-                    col_header: current_row_value
-                    for col_header, current_row_value in zip(
-                        col_headers, current_row_values
-                    )
-                }
+            if rows_count_in_current_batch < batch_size:
+                current_record_dict = next(csv_lines_iterator)
                 try:
-                    craiglist_vehicle_record_without_id = (
-                        CraigslistVehicleRecordRead.model_validate(current_record_dict)
-                    )
-                    craiglist_vehicle_record = CraigslistVehicleRecord.model_validate(
-                        craiglist_vehicle_record_without_id
+                    craiglist_vehicle_record = _validate_craigslist_vehicle_record_dict(
+                        current_record_dict
                     )
                     current_batch.append(craiglist_vehicle_record)
                     rows_count_in_current_batch += 1
