@@ -66,15 +66,15 @@ class CraigslistVehicleRecordRead(SQLModel):
         """
         A field validator that extracts the number of cylinders from the cylinders cell value to be converted to an int.
         """
-        # the next line is used to convert empty strings to None
-        cylinders_cell_value = cls.empty_string_to_none(cylinders_cell_value)
-        if cylinders_cell_value is None:
-            return None
+        if isinstance(cylinders_cell_value, int):
+            return cylinders_cell_value
         else:
             pattern = r"\d"
             try:
                 regex_match = match(pattern, cylinders_cell_value)
-                return int(regex_match[0])
+                regex_match_str = regex_match[0]
+                regex_match_int = int(regex_match_str)
+                return regex_match_int
             except:
                 return None
 
